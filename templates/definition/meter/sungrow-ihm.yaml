@@ -3,6 +3,7 @@ products:
   - brand: Sungrow
     description:
       generic: iHomeManager (iHM)
+capabilities: ["curtail"]
 params:
   - name: usage
     choice: ["grid", "pv", "battery"]
@@ -12,8 +13,10 @@ params:
     comset: "8N1"
     id: 247
     port: 502
-  - name: capacity
-    advanced: true
+  - name: maxacpower
+    usages: ["pv"]
+    service: modbus/read?address=8144&type=input&encoding=uint32&scale=100&{modbus} # Register 8145 (Total rated active power, 0.1kW)
+  - preset: battery-params
 render: |
   {{- if eq .usage "grid" }}
   type: custom
@@ -21,62 +24,67 @@ render: |
     source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8156 # Register 8157 - 1 (Total active power)
-      type: holding
+      address: 8156 # Register 8157 (Total active power)
+      type: input
       decode: int32s
     scale: 10
   energy:
     source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8175 # Register 8176 - 1 (Import energy at the grid meter)
-      type: holding
+      address: 8175 # Register 8176 (Import energy at the grid meter)
+      type: input
+      decode: uint32s
+    scale: 0.1
+  returnenergy:
+    source: modbus
+    {{- include "modbus" . | indent 2 }}
+    register:
+      address: 8177 # Register 8178 (Export energy at the grid meter)
+      type: input
       decode: uint32s
     scale: 0.1
   voltages:
   - source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8554 # Register 8555 - 1 (A-phase voltage)
-      type: holding
+      address: 4356 # Register 4357 (Phase A voltage, phase-to-neutral)
+      type: input
       decode: uint16
     scale: 0.1 # Factor 0.1 V
   - source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8555 # Register 8556 - 1 (B-phase voltage)
-      type: holding
+      address: 4358 # Register 4359 (Phase B voltage, phase-to-neutral)
+      type: input
       decode: uint16
     scale: 0.1
   - source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8556 # Register 8557 - 1 (C-phase voltage)
-      type: holding
+      address: 4360 # Register 4361 (Phase C voltage, phase-to-neutral)
+      type: input
       decode: uint16
     scale: 0.1
   powers:
   - source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8558 # Register 8559 - 1 (Phase A active power, U32)
-      type: holding
-      decode: uint32s
-    scale: 1 # Factor 1 W
+      address: 8558 # Register 8559 (Phase A active power, S32, signed import/export)
+      type: input
+      decode: int32s
   - source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8560 # Register 8561 - 1 (Phase B active power)
-      type: holding
-      decode: uint32s
-    scale: 1
+      address: 8560 # Register 8561 (Phase B active power)
+      type: input
+      decode: int32s
   - source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8562 # Register 8563 - 1 (Phase C active power)
-      type: holding
-      decode: uint32s
-    scale: 1
+      address: 8562 # Register 8563 (Phase C active power)
+      type: input
+      decode: int32s
   {{- end }}
   {{- if eq .usage "pv" }}
   type: custom
@@ -84,10 +92,53 @@ render: |
     source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8154 # Register 8155 - 1 (Total active power)
-      type: holding
+      address: 8154 # Register 8155 (Total active power)
+      type: input
       decode: int32s
     scale: 10
+  maxacpower: {{ .maxacpower }} # W
+  curtail:
+    source: sequence
+    set:
+    # allowed feed-in power as percent of nominal (0-100 % -> 0-1000 = 0.1%)
+    - source: modbus
+      {{- include "modbus" . | indent 4 }}
+      register:
+        address: 8030 # Register 8031 (Feed-in limitation ratio, 0-1000 = 0.1%)
+        type: writesingle
+        decode: int16
+      scale: 10
+    # feed-in limitation: disabled at 100% (unlimited), enabled while curtailed
+    - source: switch
+      switch:
+        - case: 100 # uncurtailed
+          set:
+            source: const
+            value: 0 # Disable feed-in limitation
+            set:
+              source: modbus
+              {{- include "modbus" . | indent 12 }}
+              register:
+                address: 8027 # Register 8028 (Feed-in limitation)
+                type: writesingle
+                decode: uint16
+      default:
+        source: const
+        value: 1 # Enable feed-in limitation
+        set:
+          source: modbus
+          {{- include "modbus" . | indent 8 }}
+          register:
+            address: 8027 # Register 8028 (Feed-in limitation)
+            type: writesingle
+            decode: uint16
+  curtailed:
+    source: modbus
+    {{- include "modbus" . | indent 2 }}
+    register:
+      address: 8027 # Register 8028 (Feed-in limitation, 1=on)
+      type: holding
+      decode: uint16
   {{- end }}
   {{- if eq .usage "battery" }}
   type: custom
@@ -95,17 +146,17 @@ render: |
     source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8160 # Register 8161 - 1 (Battery power)
-      type: holding
+      address: 8160 # Register 8161 (Battery power)
+      type: input
       decode: int32s
     scale: 10
   soc:
     source: modbus
     {{- include "modbus" . | indent 2 }}
     register:
-      address: 8162 # Register 8163 - 1 (State of charge)
-      type: holding
+      address: 8162 # Register 8163 (State of charge)
+      type: input
       decode: uint16
     scale: 0.1
-  capacity: {{ .capacity }} # kWh
+  {{- include "battery-params" . }}
   {{- end }}

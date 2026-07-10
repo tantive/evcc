@@ -1,6 +1,14 @@
 {
   "components": {
     "parameters": {
+      "adminPassword": {
+        "description": "Admin password (required for session auth, not needed for API key)",
+        "in": "header",
+        "name": "X-Admin-Password",
+        "schema": {
+          "$ref": "#/components/schemas/Password"
+        }
+      },
       "batteryMode": {
         "in": "path",
         "name": "batteryMode",
@@ -184,8 +192,8 @@
             "schema": {
               "properties": {
                 "result": {
-                  "description": "Battery mode. 0: unknown, 1: normal, 2: hold, 3: charge",
-                  "maximum": 3,
+                  "description": "Battery mode. 0: unknown, 1: normal, 2: hold, 3: charge, 4: holdcharge",
+                  "maximum": 4,
                   "minimum": 0,
                   "type": "integer"
                 }
@@ -321,6 +329,22 @@
         },
         "description": "Success - Soc result"
       },
+      "SuccessResult": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "result": {
+                  "example": "OK",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "description": "Success"
+      },
       "Unauthorized": {
         "content": {
           "text/plain": {
@@ -342,7 +366,8 @@
           "unknown",
           "normal",
           "hold",
-          "charge"
+          "charge",
+          "holdcharge"
         ],
         "example": "normal",
         "type": "string"
@@ -362,16 +387,8 @@
         "description": "Charging sessions",
         "items": {
           "properties": {
-            "chargeDuration": {
-              "description": "Duration of active charging",
-              "type": "number"
-            },
             "chargedEnergy": {
               "description": "Charged energy in kWh",
-              "type": "number"
-            },
-            "co2PerKWh": {
-              "description": "Average CO₂ emissions per kWh",
               "type": "number"
             },
             "created": {
@@ -397,21 +414,7 @@
               "type": "number"
             },
             "odometer": {
-              "description": "Vehicle odometer reading in kilometers",
-              "nullable": true,
-              "type": "number"
-            },
-            "price": {
-              "description": "Total price of the session",
-              "type": "number"
-            },
-            "pricePerKWh": {
-              "description": "Average price per kWh",
-              "type": "number"
-            },
-            "solarPercentage": {
-              "description": "Solar percentage of the session",
-              "type": "number"
+              "$ref": "#/components/schemas/Odometer"
             },
             "vehicle": {
               "$ref": "#/components/schemas/VehicleName"
@@ -437,6 +440,60 @@
         "example": 25.5,
         "minimum": 0,
         "type": "number"
+      },
+      "GridSessions": {
+        "description": "Grid limitation sessions",
+        "items": {
+          "properties": {
+            "chargeDuration": {
+              "description": "Duration of active charging",
+              "type": "number"
+            },
+            "co2PerKWh": {
+              "description": "Average CO₂ emissions per kWh",
+              "type": "number"
+            },
+            "created": {
+              "$ref": "#/components/schemas/Timestamp"
+            },
+            "finished": {
+              "$ref": "#/components/schemas/Timestamp"
+            },
+            "gridPower": {
+              "description": "Grid power in watts",
+              "type": "number"
+            },
+            "id": {
+              "$ref": "#/components/schemas/Id"
+            },
+            "limitPower": {
+              "description": "Limitation power in watts",
+              "type": "number"
+            },
+            "price": {
+              "description": "Total price of the session",
+              "type": "number"
+            },
+            "pricePerKWh": {
+              "description": "Average price per kWh",
+              "type": "number"
+            },
+            "solarPercentage": {
+              "description": "Solar percentage of the session",
+              "type": "number"
+            },
+            "type": {
+              "description": "Type of grid limitation event",
+              "enum": [
+                "consumption",
+                "feedin"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
       },
       "HourMinuteTime": {
         "description": "Time in `HH:MM` format",
@@ -511,6 +568,11 @@
         ],
         "type": "string"
       },
+      "Odometer": {
+        "description": "Vehicle odometer reading in kilometers",
+        "nullable": true,
+        "type": "number"
+      },
       "Password": {
         "description": "Admin password",
         "type": "string"
@@ -540,6 +602,21 @@
           },
           "power": {
             "$ref": "#/components/schemas/Power"
+          }
+        },
+        "type": "object"
+      },
+      "PlanStrategy": {
+        "description": "Charging plan strategy configuration",
+        "properties": {
+          "continuous": {
+            "description": "Force continuous planning",
+            "type": "boolean"
+          },
+          "precondition": {
+            "description": "Precondition duration in seconds",
+            "minimum": 0,
+            "type": "integer"
           }
         },
         "type": "object"
@@ -588,9 +665,6 @@
             "description": "Set plan active.",
             "type": "boolean"
           },
-          "precondition": {
-            "$ref": "#/components/schemas/Precondition"
-          },
           "soc": {
             "$ref": "#/components/schemas/Soc"
           },
@@ -625,9 +699,6 @@
           "energy": {
             "$ref": "#/components/schemas/Energy"
           },
-          "precondition": {
-            "$ref": "#/components/schemas/Precondition"
-          },
           "time": {
             "$ref": "#/components/schemas/Timestamp"
           }
@@ -639,9 +710,6 @@
           "url": "https://docs.evcc.io/en/docs/features/plans#create-charging-plan"
         },
         "properties": {
-          "precondition": {
-            "$ref": "#/components/schemas/Precondition"
-          },
           "soc": {
             "$ref": "#/components/schemas/Soc"
           },
@@ -653,7 +721,6 @@
       },
       "Timestamp": {
         "description": "Timestamp in RFC3339 format",
-        "example": "2025-07-19T12:30:00Z",
         "format": "date-time",
         "type": "string"
       },
@@ -691,6 +758,11 @@
       }
     },
     "securitySchemes": {
+      "bearerAuth": {
+        "description": "Long-lived API key (prefixed `evcc_`, managed via /auth/apikey).\nGrants access to /api/db/* without requiring the X-Admin-Password header.\n",
+        "scheme": "bearer",
+        "type": "http"
+      },
       "cookieAuth": {
         "in": "cookie",
         "name": "auth",
@@ -708,6 +780,100 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/auth/apikey": {
+      "get": {
+        "description": "Reports whether an API key has been generated. The key itself is\nonly returned once at creation time (POST), never on subsequent\nreads.\n",
+        "operationId": "getApiKeyStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "API key status",
+        "tags": [
+          "auth"
+        ]
+      },
+      "post": {
+        "description": "Generates a fresh API key, replacing any existing one. The\nreturned key is shown only once; store it immediately.\n\nEven when the request is authenticated via API key (Bearer), the\nadmin password must be supplied in the request body to prevent a\nleaked key from rotating itself. The password check is skipped\nwhen the server is started with `--disable-auth`.\n",
+        "operationId": "regenerateApiKey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "password": {
+                    "$ref": "#/components/schemas/Password"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "key": {
+                      "description": "The new API key (cleartext, shown once).",
+                      "example": "evcc_aB3xYz7k0Pq2sN5mWtR4",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          },
+          "401": {
+            "description": "Invalid admin password"
+          },
+          "403": {
+            "description": "Forbidden in demo mode"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Generate or rotate the API key",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/login": {
       "post": {
         "description": "Administrator login. Returns authorization cookie required for all protected endpoints.",
@@ -975,16 +1141,193 @@
         ]
       }
     },
-    "/health": {
+    "/db/backup": {
       "get": {
-        "description": "Returns 200 if the evcc loop runs as expected.",
-        "operationId": "healthCheck",
+        "description": "Downloads the SQLite database as a backup file. Session users must supply the admin password in the X-Admin-Password header. API key holders via Bearer token are exempt.",
+        "operationId": "downloadBackup",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/adminPassword"
+          }
+        ],
         "responses": {
           "200": {
             "content": {
-              "text/plain": {
+              "application/octet-stream": {
                 "schema": {
-                  "example": "OK",
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "SQLite database file"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Download database backup",
+        "tags": [
+          "db"
+        ]
+      }
+    },
+    "/db/reset": {
+      "post": {
+        "description": "Selectively deletes sessions and/or settings from the database. Session users must supply the admin password in the X-Admin-Password header. API key holders via Bearer token are exempt. The instance restarts after a successful reset.",
+        "operationId": "resetDatabase",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/adminPassword"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "sessions": {
+                    "description": "Delete all charging sessions",
+                    "type": "boolean"
+                  },
+                  "settings": {
+                    "description": "Delete all settings, configs, and meters",
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Reset successful, instance is restarting"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reset database",
+        "tags": [
+          "db"
+        ]
+      }
+    },
+    "/db/restore": {
+      "post": {
+        "description": "Restores the database from a previously downloaded backup file. Session users must supply the admin password in the X-Admin-Password header. API key holders via Bearer token are exempt. The instance restarts after a successful restore.",
+        "operationId": "restoreBackup",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/adminPassword"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "description": "SQLite database backup file",
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Restore successful, instance is restarting"
+          },
+          "400": {
+            "description": "Invalid file or missing fields"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Restore database backup",
+        "tags": [
+          "db"
+        ]
+      }
+    },
+    "/gridsessions": {
+      "get": {
+        "description": "Returns a list of HEMS grid limitation events.",
+        "operationId": "getGridSessions",
+        "parameters": [
+          {
+            "description": "Response format (default json)",
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "enum": [
+                "csv"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language (defaults to accept header)",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "example": "de",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/GridSessions"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "description": "Download csv-file",
+                  "format": "binary",
                   "type": "string"
                 }
               }
@@ -992,15 +1335,147 @@
             "description": "Success"
           }
         },
-        "summary": "Health check",
+        "summary": "Grid limitation sessions",
         "tags": [
-          "general"
+          "sessions"
+        ]
+      }
+    },
+    "/history/energy": {
+      "get": {
+        "description": "Returns aggregated energy history data. Aggregate granularity defaults to 15 minutes. Supports CSV export.",
+        "operationId": "getEnergyHistory",
+        "parameters": [
+          {
+            "description": "Start time (RFC3339)",
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "example": "2026-07-01T00:00:00Z",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "End time (RFC3339)",
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "example": "2026-07-02T00:00:00Z",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Aggregation interval. Examples: 15m, 1h, day, month",
+            "in": "query",
+            "name": "aggregate",
+            "schema": {
+              "default": "15m",
+              "example": "1h",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Group results by loadpoint",
+            "in": "query",
+            "name": "grouped",
+            "schema": {
+              "default": false,
+              "example": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Filter by entity group",
+            "in": "query",
+            "name": "group",
+            "schema": {
+              "enum": [
+                "forecast",
+                "battery",
+                "grid",
+                "pv",
+                "home",
+                "loadpoint",
+                "meter",
+                "consumer"
+              ],
+              "example": "battery",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by entity name",
+            "in": "query",
+            "name": "name",
+            "schema": {
+              "example": "db:8",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by entity title",
+            "in": "query",
+            "name": "title",
+            "schema": {
+              "example": "Battery",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Response format",
+            "in": "query",
+            "name": "format",
+            "schema": {
+              "default": "json",
+              "enum": [
+                "json",
+                "csv"
+              ],
+              "example": "json",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language for CSV column headers (BCP 47, e.g. de, en). Defaults to Accept-Language header.",
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "example": "de",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Energy history data"
+          },
+          "400": {
+            "description": "Invalid parameters or database offline"
+          }
+        },
+        "summary": "Energy history",
+        "tags": [
+          "experimental"
         ]
       }
     },
     "/loadpoints/{id}/batteryboost/{enable}": {
       "post": {
-        "description": "Enable or disable battery boost.",
+        "description": "Enable or disable battery boost. When active, the maximum available home battery power is added until the home battery is drained to configured SoC limit. Note: boost will not work while the battery is on hold (e.g. during fast charging or planned charging with discharge prevention enabled).",
         "externalDocs": {
           "url": "https://docs.evcc.io/en/docs/features/battery#battery-boost"
         },
@@ -1019,6 +1494,32 @@
           }
         },
         "summary": "Set battery boost",
+        "tags": [
+          "loadpoints"
+        ]
+      }
+    },
+    "/loadpoints/{id}/batteryboostlimit/{soc}": {
+      "post": {
+        "description": "Set the SoC limit for battery boost. Home battery will be used to support charging up to this SoC level. A value of 100 (default) disabled the boost feature in UI and API.",
+        "externalDocs": {
+          "url": "https://docs.evcc.io/en/docs/features/battery#battery-boost"
+        },
+        "operationId": "setLoadpointBatteryBoostLimit",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          },
+          {
+            "$ref": "#/components/parameters/soc"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/IntegerResult"
+          }
+        },
+        "summary": "Set battery boost SoC limit",
         "tags": [
           "loadpoints"
         ]
@@ -1156,7 +1657,7 @@
     },
     "/loadpoints/{id}/limitsoc/{soc}": {
       "post": {
-        "description": "Updates the SoC limit of the loadpoint. Requires a connected vehicle with known SoC. Limit is maintained across charging sessions.",
+        "description": "Sets the session SoC limit. Cleared on disconnect. Takes precedence over the vehicle's configured limit while set; once cleared (set to 0), the vehicle limit applies again.",
         "externalDocs": {
           "url": "https://docs.evcc.io/en/docs/features/limit"
         },
@@ -1174,7 +1675,7 @@
             "$ref": "#/components/responses/NumberResult"
           }
         },
-        "summary": "Update limit SoC",
+        "summary": "Update session SoC limit",
         "tags": [
           "loadpoints"
         ]
@@ -1317,9 +1818,6 @@
                           "properties": {
                             "planId": {
                               "$ref": "#/components/schemas/Id"
-                            },
-                            "precondition": {
-                              "$ref": "#/components/schemas/Precondition"
                             }
                           },
                           "type": "object"
@@ -1495,6 +1993,51 @@
           }
         },
         "summary": "Simulate soc-based charging plan",
+        "tags": [
+          "loadpoints"
+        ]
+      }
+    },
+    "/loadpoints/{id}/plan/strategy": {
+      "post": {
+        "description": "Updates the charging plan strategy for the loadpoint.",
+        "externalDocs": {
+          "url": "https://docs.evcc.io/en/docs/features/plans"
+        },
+        "operationId": "setLoadpointPlanStrategy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanStrategy"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/PlanStrategy"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          }
+        },
+        "summary": "Set plan strategy",
         "tags": [
           "loadpoints"
         ]
@@ -1782,7 +2325,7 @@
         }
       ],
       "put": {
-        "description": "Update vehicle of charging session.",
+        "description": "Update vehicle, loadpoint or odometer of a charging session. Only provided fields are changed; a null odometer clears the stored value.",
         "externalDocs": {
           "url": "https://docs.evcc.io/en/docs/features/sessions"
         },
@@ -1794,6 +2337,9 @@
                 "properties": {
                   "loadpoint": {
                     "$ref": "#/components/schemas/LoadpointName"
+                  },
+                  "odometer": {
+                    "$ref": "#/components/schemas/Odometer"
                   },
                   "vehicle": {
                     "$ref": "#/components/schemas/VehicleName"
@@ -1810,7 +2356,7 @@
             "description": "Success"
           }
         },
-        "summary": "Update vehicle of charging session",
+        "summary": "Update charging session",
         "tags": [
           "sessions"
         ]
@@ -2041,6 +2587,32 @@
         ]
       }
     },
+    "/system/cache": {
+      "delete": {
+        "description": "Clears all cached data. This resets all cached values from tariffs, vehicle APIs, and other components that use caching.",
+        "operationId": "clearCache",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResult"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Clear cache",
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/system/log": {
       "get": {
         "description": "Returns the latest log lines.",
@@ -2109,6 +2681,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "summary": "Logs",
@@ -2144,6 +2719,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "summary": "List of all log areas",
@@ -2167,6 +2745,9 @@
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
           }
         ],
         "summary": "Shutdown evcc",
@@ -2283,6 +2864,67 @@
         ]
       }
     },
+    "/vehicles/{name}/mode": {
+      "delete": {
+        "description": "Resets the vehicle charge mode to keep the last selected mode.",
+        "externalDocs": {
+          "url": "https://docs.evcc.io/en/docs/features/solar-charging"
+        },
+        "operationId": "deleteVehicleMode",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/vehicleName"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResult"
+          }
+        },
+        "summary": "Reset charge mode",
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
+    "/vehicles/{name}/mode/{mode}": {
+      "post": {
+        "description": "Sets the charge mode applied when this vehicle becomes active on a loadpoint.",
+        "externalDocs": {
+          "url": "https://docs.evcc.io/en/docs/features/solar-charging"
+        },
+        "operationId": "setVehicleMode",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/vehicleName"
+          },
+          {
+            "$ref": "#/components/parameters/mode"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "mode": {
+                      "$ref": "#/components/schemas/Mode"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          }
+        },
+        "summary": "Set charge mode",
+        "tags": [
+          "vehicles"
+        ]
+      }
+    },
     "/vehicles/{name}/plan/repeating": {
       "post": {
         "description": "Updates the repeating charging plan.",
@@ -2373,13 +3015,6 @@
           },
           {
             "$ref": "#/components/parameters/timestamp"
-          },
-          {
-            "in": "query",
-            "name": "precondition",
-            "schema": {
-              "$ref": "#/components/schemas/Precondition"
-            }
           }
         ],
         "responses": {
@@ -2389,7 +3024,15 @@
                 "schema": {
                   "properties": {
                     "result": {
-                      "$ref": "#/components/schemas/StaticSocPlan"
+                      "properties": {
+                        "soc": {
+                          "$ref": "#/components/schemas/Soc"
+                        },
+                        "time": {
+                          "$ref": "#/components/schemas/Timestamp"
+                        }
+                      },
+                      "type": "object"
                     }
                   },
                   "type": "object"
@@ -2404,6 +3047,51 @@
           "vehicles"
         ]
       }
+    },
+    "/vehicles/{name}/plan/strategy": {
+      "post": {
+        "description": "Updates the charging plan strategy for the vehicle.",
+        "externalDocs": {
+          "url": "https://docs.evcc.io/en/docs/features/plans"
+        },
+        "operationId": "setVehiclePlanStrategy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/vehicleName"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanStrategy"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/PlanStrategy"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success"
+          }
+        },
+        "summary": "Set plan strategy",
+        "tags": [
+          "vehicles"
+        ]
+      }
     }
   },
   "tags": [
@@ -2412,6 +3100,12 @@
     },
     {
       "name": "battery"
+    },
+    {
+      "name": "db"
+    },
+    {
+      "name": "experimental"
     },
     {
       "name": "general"
